@@ -78,7 +78,7 @@ dependencies {
     implementation 'androidx.cardview:cardview:1.0.0'
 
     // FFmpeg Kit - 音频处理核心库 (LGPL 3.0)
-    implementation 'com.arthenica:ffmpeg-kit-full:6.0-2'
+    implementation 'com.arthenica:ffmpeg-kit-full:6.0-2.LTS'
 
     // Smart Exception (FFmpeg Kit 依赖)
     implementation 'com.arthenica:smart-exception-java:0.2.1'
