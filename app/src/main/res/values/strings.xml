@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">视频音频提取器</string>
+
+    <!-- 上传区域 -->
+    <string name="section_upload_title">选择视频文件</string>
+    <string name="section_upload_subtitle">支持 MP4、AVI、MOV、MKV、WMV、FLV、WEBM、3GP 等多种视频格式</string>
+    <string name="upload_hint">拖拽视频文件到这里\n或者 点击选择文件</string>
+    <string name="btn_select_video">选择视频文件</string>
+    <string name="video_icon">视频图标</string>
+    <string name="video_thumbnail">视频缩略图</string>
+
+    <!-- 格式选择 -->
+    <string name="section_format_title">选择输出格式</string>
+    <string name="section_format_subtitle">支持提取为以下音频格式</string>
+
+    <string name="icon_mp3">MP3</string>
+    <string name="format_mp3">MP3</string>
+    <string name="format_mp3_desc">通用格式\n体积小</string>
+
+    <string name="icon_aac">AAC</string>
+    <string name="format_aac">AAC</string>
+    <string name="format_aac_desc">高质量\n兼容性好</string>
+
+    <string name="icon_wav">WAV</string>
+    <string name="format_wav">WAV</string>
+    <string name="format_wav_desc">无损格式\n文件较大</string>
+
+    <string name="icon_flac">FLAC</string>
+    <string name="format_flac">FLAC</string>
+    <string name="format_flac_desc">无损压缩\n音质优秀</string>
+
+    <string name="icon_m4a">M4A</string>
+    <string name="format_m4a">M4A</string>
+    <string name="format_m4a_desc">Apple格式\n体积适中</string>
+
+    <!-- 质量设置 -->
+    <string name="section_quality_title">音频质量设置</string>
+    <string name="label_bitrate">比特率</string>
+    <string name="label_sample_rate">采样率</string>
+
+    <!-- 提取处理 -->
+    <string name="section_extract_title">开始提取</string>
+    <string name="btn_extract">开始提取音频</string>
+
+    <!-- 进度状态 -->
+    <string name="status_preparing">正在准备提取…</string>
+    <string name="status_extracting">正在提取音频…</string>
+    <string name="status_complete">提取完成</string>
+    <string name="status_failed">提取失败</string>
+    <string name="status_cancelled">已取消</string>
+
+    <!-- 完成操作 -->
+    <string name="success">成功</string>
+    <string name="btn_play">播放</string>
+    <string name="btn_share">分享</string>
+    <string name="btn_save">保存</string>
+
+    <!-- 功能特点 -->
+    <string name="section_features_title">功能特点</string>
+    <string name="feature_bullet">&#8226;</string>
+    <string name="feature_1">完全免费使用，无需注册</string>
+    <string name="feature_2">支持5种音频格式提取 (MP3、AAC、WAV、FLAC、M4A)</string>
+    <string name="feature_3">保持原音频质量，可自定义比特率和采样率</string>
+    <string name="feature_4">本地处理，文件不上传服务器，安全可靠</string>
+
+    <!-- 设置 -->
+    <string name="settings">设置</string>
+
+    <!-- 错误提示 -->
+    <string name="error_no_video">请先选择视频文件</string>
+    <string name="error_no_format">请选择输出格式</string>
+    <string name="error_copy_failed">复制视频文件失败</string>
+    <string name="error_ffmpeg_failed">音频提取失败，请重试</string>
+    <string name="error_permission">需要存储权限才能保存文件</string>
+
+    <!-- 通知 -->
+    <string name="notification_channel_name">音频提取</string>
+    <string name="notification_channel_desc">音频提取进度通知</string>
+    <string name="notification_extracting">正在提取音频…</string>
+
+    <!-- 比特率选项 -->
+    <string-array name="bitrate_options">
+        <item>128 kbps（标准）</item>
+        <item>192 kbps（推荐）</item>
+        <item>256 kbps（高品质）</item>
+        <item>320 kbps（最高品质）</item>
+    </string-array>
+
+    <!-- 采样率选项 -->
+    <string-array name="sample_rate_options">
+        <item>44100 Hz（CD品质）</item>
+        <item>48000 Hz（DVD品质）</item>
+        <item>22050 Hz（语音）</item>
+    </string-array>
+</resources>

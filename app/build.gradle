@@ -1,0 +1,85 @@
+plugins {
+    id 'com.android.application'
+}
+
+// 签名配置：优先使用环境变量（CI），其次使用 keystore.properties 文件（本地）
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+def releaseStoreFile = System.getenv("KEYSTORE_FILE") ?: keystoreProperties.getProperty("storeFile")
+def releaseStorePassword = System.getenv("KEYSTORE_PASSWORD") ?: keystoreProperties.getProperty("storePassword")
+def releaseKeyAlias = System.getenv("KEY_ALIAS") ?: keystoreProperties.getProperty("keyAlias")
+def releaseKeyPassword = System.getenv("KEY_PASSWORD") ?: keystoreProperties.getProperty("keyPassword")
+
+android {
+    namespace 'com.videoaudio.extractor'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.videoaudio.extractor"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    signingConfigs {
+        release {
+            if (releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword) {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    viewBinding {
+        enabled = true
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            def buildType = variant.buildType.name
+            def versionName = variant.versionName
+            def versionCode = variant.versionCode
+            outputFileName = "VideoAudioExtractor-${buildType}-${versionName}-${versionCode}.apk"
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.cardview:cardview:1.0.0'
+
+    // FFmpeg Kit - 音频处理核心库 (LGPL 3.0)
+    implementation 'com.arthenica:ffmpeg-kit-full:6.0-2'
+
+    // Smart Exception (FFmpeg Kit 依赖)
+    implementation 'com.arthenica:smart-exception-java:0.2.1'
+}
