@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 音符图标作为前景 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,30 L42,68 C42,68 38,66 34,66 C28,66 24,70 24,74 C24,78 28,82 34,82 C40,82 44,78 44,74 L44,42 L68,36 L68,62 C68,62 64,60 60,60 C54,60 50,64 50,68 C50,72 54,76 60,76 C66,76 70,72 70,68 L70,30 Z" />
+</vector>
