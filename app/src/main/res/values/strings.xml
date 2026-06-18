@@ -34,6 +34,11 @@
     <string name="format_m4a">M4A</string>
     <string name="format_m4a_desc">Apple格式\n体积适中</string>
 
+    <!-- 文件名设置 -->
+    <string name="section_filename_title">输出文件名</string>
+    <string name="section_filename_subtitle">自定义提取后音频文件的名称（留空则使用视频原名）</string>
+    <string name="hint_filename">输入文件名</string>
+
     <!-- 质量设置 -->
     <string name="section_quality_title">音频质量设置</string>
     <string name="label_bitrate">比特率</string>

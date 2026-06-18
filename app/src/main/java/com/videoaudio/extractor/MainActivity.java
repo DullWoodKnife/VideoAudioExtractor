@@ -9,6 +9,7 @@ import android.provider.OpenableColumns;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -59,6 +60,8 @@ public class MainActivity extends AppCompatActivity {
     private MaterialButton btnPlay;
     private MaterialButton btnShare;
     private MaterialButton btnSave;
+    private EditText etOutputFilename;
+    private TextView tvFilenameExtension;
 
     // ========== 格式卡片 ==========
     private final Map<String, LinearLayout> formatCards = new HashMap<>();
@@ -127,6 +130,8 @@ public class MainActivity extends AppCompatActivity {
         btnPlay = findViewById(R.id.btn_play);
         btnShare = findViewById(R.id.btn_share);
         btnSave = findViewById(R.id.btn_save);
+        etOutputFilename = findViewById(R.id.et_output_filename);
+        tvFilenameExtension = findViewById(R.id.tv_filename_extension);
     }
 
     /**
@@ -200,6 +205,7 @@ public class MainActivity extends AppCompatActivity {
      */
     private void updateFormatSelection(String format) {
         selectedFormat = format;
+        tvFilenameExtension.setText("." + format);
         for (Map.Entry<String, LinearLayout> entry : formatCards.entrySet()) {
             LinearLayout card = entry.getValue();
             if (entry.getKey().equals(format)) {
@@ -221,6 +227,10 @@ public class MainActivity extends AppCompatActivity {
 
         String displayName = queryDisplayName(uri);
         tvVideoName.setText(displayName);
+
+        // 自动填入文件名（不含扩展名）
+        String baseName = FileUtils.getBaseName(displayName);
+        etOutputFilename.setText(baseName);
 
         // 获取视频时长和大小
         try {
@@ -280,6 +290,18 @@ public class MainActivity extends AppCompatActivity {
 
                 // 2. 构建输出文件路径
                 String baseName = FileUtils.getBaseName(queryDisplayName(pickedVideoUri));
+
+                // 检查用户是否自定义了文件名
+                String customName = etOutputFilename.getText().toString().trim();
+                if (!customName.isEmpty()) {
+                    // 移除可能的手动输入扩展名，统一由格式决定
+                    int dotIdx = customName.lastIndexOf('.');
+                    if (dotIdx > 0) {
+                        customName = customName.substring(0, dotIdx);
+                    }
+                    baseName = customName;
+                }
+
                 String extension = "." + selectedFormat;
                 localOutputFile = new File(getExternalFilesDir(null), baseName + extension);
 
