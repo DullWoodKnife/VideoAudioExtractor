@@ -4,7 +4,6 @@ import android.util.Log;
 
 import com.arthenica.ffmpegkit.FFmpegKit;
 import com.arthenica.ffmpegkit.ReturnCode;
-import com.arthenica.ffmpegkit.SessionState;
 
 import java.io.File;
 
@@ -59,8 +58,24 @@ public class AudioExtractor {
         String command = buildCommand(inputPath, outputPath, format, bitrate, sampleRate);
         Log.d(TAG, "FFmpeg command: " + command);
 
-        // 获取视频时长用于计算进度
-        getVideoDuration(inputPath, durationMs -> {
+        // 获取视频时长用于计算进度（使用 ffprobe 命令）
+        final long[] durationMs = {0};
+        String probeCommand = String.format("-v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 %s",
+                quotePath(inputPath));
+
+        FFmpegKit.executeAsync(probeCommand, probeSession -> {
+            if (ReturnCode.isSuccess(probeSession.getReturnCode())) {
+                String output = probeSession.getOutput();
+                if (output != null && !output.isEmpty()) {
+                    try {
+                        durationMs[0] = (long) (Double.parseDouble(output.trim()) * 1000);
+                    } catch (NumberFormatException e) {
+                        Log.w(TAG, "解析视频时长失败: " + output);
+                    }
+                }
+            }
+
+            // 开始执行音频提取
             FFmpegKit.executeAsync(command, session -> {
                 Log.d(TAG, "FFmpeg session completed. Return code: " + session.getReturnCode());
 
@@ -84,9 +99,9 @@ public class AudioExtractor {
                 Log.d(TAG, "FFmpeg: " + log.getMessage());
             }, statistics -> {
                 // 统计信息用于进度计算
-                if (durationMs > 0 && statistics.getTime() > 0) {
+                if (durationMs[0] > 0 && statistics.getTime() > 0) {
                     int progress = (int) Math.min(100,
-                            (statistics.getTime() * 100.0 / durationMs));
+                            (statistics.getTime() * 100.0 / durationMs[0]));
                     callback.onProgress(progress);
                 }
             });
@@ -144,36 +159,9 @@ public class AudioExtractor {
     }
 
     /**
-     * 获取视频时长（毫秒）
-     */
-    private static void getVideoDuration(String inputPath, DurationCallback callback) {
-        FFmpegKit.getMediaInformationAsync(inputPath, mediaInformation -> {
-            if (mediaInformation != null && mediaInformation.getDuration() != null) {
-                try {
-                    // getDuration() 返回的是毫秒
-                    long durationMs = (long) (mediaInformation.getDuration().doubleValue() * 1000);
-                    callback.onResult(durationMs);
-                } catch (Exception e) {
-                    Log.w(TAG, "解析视频时长失败", e);
-                    callback.onResult(0);
-                }
-            } else {
-                callback.onResult(0);
-            }
-        }, null);
-    }
-
-    /**
      * 路径引号包裹（处理空格）
      */
     private static String quotePath(String path) {
         return "\"" + path.replace("\"", "\\\"") + "\"";
-    }
-
-    /**
-     * 时长获取回调
-     */
-    private interface DurationCallback {
-        void onResult(long durationMs);
     }
 }
