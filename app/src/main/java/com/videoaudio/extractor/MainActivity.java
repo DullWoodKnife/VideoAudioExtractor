@@ -1,6 +1,7 @@
 package com.videoaudio.extractor;
 
 import android.content.ContentResolver;
+import android.content.Intent;
 import android.database.Cursor;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
@@ -88,8 +89,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // ========== 视频选择器 ==========
-    private final ActivityResultLauncher<String> pickVideoLauncher =
-            registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
+    // 使用 ACTION_OPEN_DOCUMENT 允许浏览所有文件（包括图库不识别的格式如 .vdat）
+    private final ActivityResultLauncher<Intent> pickVideoLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() != RESULT_OK || result.getData() == null) {
+                    return;
+                }
+                Uri uri = result.getData().getData();
                 if (uri == null) {
                     Toast.makeText(this, R.string.error_no_video, Toast.LENGTH_SHORT).show();
                     return;
@@ -172,7 +178,16 @@ public class MainActivity extends AppCompatActivity {
      * 初始化点击事件
      */
     private void initClickListeners() {
-        btnSelectVideo.setOnClickListener(v -> pickVideoLauncher.launch("video/*"));
+        btnSelectVideo.setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            // 同时接受视频 MIME 类型和所有文件，确保能浏览到图库不识别的文件
+            intent.setType("*/*");
+            // 优先显示视频文件，但允许选择任意文件
+            String[] mimeTypes = {"video/*", "application/octet-stream"};
+            intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+            pickVideoLauncher.launch(intent);
+        });
 
         btnExtract.setOnClickListener(v -> startExtraction());
 
