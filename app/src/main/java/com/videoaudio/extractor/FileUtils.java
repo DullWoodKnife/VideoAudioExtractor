@@ -17,6 +17,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.channels.FileChannel;
 
 /**
  * 文件操作工具类
@@ -27,7 +28,11 @@ public class FileUtils {
     private static final String MIME_AUDIO_PREFIX = "audio/";
 
     /**
-     * 将 URI 内容复制到应用缓存目录
+     * 将 URI 内容复制到应用缓存目录（性能优化版）
+     *
+     * 优化策略：
+     * 1. 优先使用 FileChannel.transferTo 零拷贝（内核态直接传输，避免用户态拷贝）
+     * 2. 回退时使用 8MB 大缓冲区（原为 1MB）
      *
      * @param context 上下文
      * @param uri     内容 URI
@@ -46,17 +51,29 @@ public class FileUtils {
 
         File outFile = File.createTempFile(prefix + "_", suffix, context.getCacheDir());
 
-        try (InputStream in = context.getContentResolver().openInputStream(uri);
-             OutputStream out = new FileOutputStream(outFile)) {
+        try (InputStream in = context.getContentResolver().openInputStream(uri)) {
             if (in == null) {
                 throw new IllegalStateException("无法打开输入流");
             }
-            byte[] buf = new byte[1024 * 1024]; // 1MB 缓冲
-            int read;
-            while ((read = in.read(buf)) != -1) {
-                out.write(buf, 0, read);
+
+            // 如果输入是 FileInputStream（文件 URI），使用 FileChannel 零拷贝
+            if (in instanceof FileInputStream) {
+                try (FileChannel srcChannel = ((FileInputStream) in).getChannel();
+                     FileOutputStream fos = new FileOutputStream(outFile);
+                     FileChannel dstChannel = fos.getChannel()) {
+                    dstChannel.transferFrom(srcChannel, 0, Long.MAX_VALUE);
+                }
+            } else {
+                // 非文件输入流（如 content://），使用大缓冲区
+                try (OutputStream out = new FileOutputStream(outFile)) {
+                    byte[] buf = new byte[8 * 1024 * 1024]; // 8MB 缓冲
+                    int read;
+                    while ((read = in.read(buf)) != -1) {
+                        out.write(buf, 0, read);
+                    }
+                    out.flush();
+                }
             }
-            out.flush();
         }
 
         return outFile;
