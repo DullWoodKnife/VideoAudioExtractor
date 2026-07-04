@@ -84,8 +84,10 @@ public class AudioExtractor {
             }, log -> Log.d(TAG, "FFmpeg: " + log.getMessage()),
             statistics -> {
                 if (durationMs[0] > 0 && statistics.getTime() > 0) {
+                    // statistics.getTime() 返回秒，durationMs 是毫秒，统一转为秒计算
+                    double durationSec = durationMs[0] / 1000.0;
                     int progress = (int) Math.min(100,
-                            (statistics.getTime() * 100.0 / durationMs[0]));
+                            (statistics.getTime() * 100.0 / durationSec));
                     callback.onProgress(progress);
                 }
             });
