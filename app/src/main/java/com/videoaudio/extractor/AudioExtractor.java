@@ -3,8 +3,6 @@ package com.videoaudio.extractor;
 import android.util.Log;
 
 import com.arthenica.ffmpegkit.FFmpegKit;
-import com.arthenica.ffmpegkit.Level;
-import com.arthenica.ffmpegkit.LogMessage;
 import com.arthenica.ffmpegkit.ReturnCode;
 
 import java.io.File;
@@ -101,12 +99,13 @@ public class AudioExtractor {
                 }
             }, logMessage -> {
                 // 通过解析 FFmpeg 日志输出计算进度和 ETA
-                int progress = parseProgressFromLog(logMessage, durationSec[0]);
+                String logText = logMessage.getMessage();
+                int progress = parseProgressFromLog(logText, durationSec[0]);
                 if (progress >= 0) {
                     callback.onProgress(progress);
                 }
                 // 计算 ETA
-                String eta = parseEtaFromLog(logMessage, durationSec[0]);
+                String eta = parseEtaFromLog(logText, durationSec[0]);
                 if (eta != null) {
                     callback.onEtaUpdate(eta);
                 }
@@ -127,14 +126,11 @@ public class AudioExtractor {
      * FFmpeg 日志格式示例：
      *   frame=  100 fps=50 q=28.0 size=    1024kB time=00:00:05.20 bitrate=162.5kbits/s speed=3.2x
      *
-     * @param logMessage    FFmpegKit 日志消息
+     * @param text          FFmpegKit 日志文本
      * @param totalDuration 视频总时长（秒），0 表示未知
      * @return 进度百分比 0-100，如果无法解析返回 -1
      */
-    private static int parseProgressFromLog(LogMessage logMessage, double totalDuration) {
-        if (logMessage == null) return -1;
-
-        String text = logMessage.getMessage();
+    private static int parseProgressFromLog(String text, double totalDuration) {
         if (text == null) return -1;
 
         // 只处理包含 time= 的日志行（通常是 AV_LOG_INFO 级别）
@@ -187,15 +183,12 @@ public class AudioExtractor {
      * 结合已处理时长和总时长，可推算剩余时间：
      *   剩余时间 = (总时长 - 已处理时长) / speed
      *
-     * @param logMessage    FFmpegKit 日志消息
+     * @param text          FFmpegKit 日志文本
      * @param totalDuration 视频总时长（秒），0 表示未知
      * @return ETA 文字描述，如 "剩余 1分30秒"，无法计算返回 null
      */
-    private static String parseEtaFromLog(LogMessage logMessage, double totalDuration) {
-        if (logMessage == null || totalDuration <= 0) return null;
-
-        String text = logMessage.getMessage();
-        if (text == null) return null;
+    private static String parseEtaFromLog(String text, double totalDuration) {
+        if (text == null || totalDuration <= 0) return null;
 
         // 需要 time= 和 speed= 两个字段
         int timeIdx = text.indexOf("time=");
