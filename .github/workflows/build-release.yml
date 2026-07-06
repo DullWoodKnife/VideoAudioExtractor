@@ -45,7 +45,7 @@ jobs:
           else
             keytool -genkey -v -keystore app/release.keystore -alias release -keyalg RSA -keysize 2048 -validity 10000 -storepass github2024 -keypass github2024 -dname "CN=GitHub Actions, OU=CI, O=GitHub, L=Unknown, ST=Unknown, C=US"
           fi
-          echo "KEYSTORE_FILE=app/release.keystore" >> $GITHUB_ENV
+          echo "KEYSTORE_FILE=release.keystore" >> $GITHUB_ENV
           if [ -n "$KEYSTORE_PASSWORD" ]; then
             echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
           else
@@ -73,7 +73,7 @@ jobs:
       - name: Build Release APK
         run: ./gradlew assembleRelease --stacktrace
         env:
-          KEYSTORE_FILE: app/release.keystore
+          KEYSTORE_FILE: release.keystore
           KEYSTORE_PASSWORD: ${{ env.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ env.KEY_ALIAS }}
           KEY_PASSWORD: ${{ env.KEY_PASSWORD }}
