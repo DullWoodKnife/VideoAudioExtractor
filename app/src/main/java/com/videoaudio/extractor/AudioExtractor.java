@@ -32,18 +32,52 @@ public class AudioExtractor {
     }
 
     /**
-     * 从视频中提取音频
+     * 从视频中提取音频（全量提取）
      */
     public static void extractAudio(String inputPath, String outputPath,
                                     String format, int bitrate, int sampleRate,
                                     Callback callback) {
+        extractAudio(inputPath, outputPath, format, bitrate, sampleRate,
+                -1, -1, callback);
+    }
+
+    /**
+     * 从视频中提取音频（支持时间区间）
+     *
+     * @param inputPath    输入视频路径
+     * @param outputPath   输出音频路径
+     * @param format       目标格式
+     * @param bitrate      比特率
+     * @param sampleRate   采样率
+     * @param startTimeSec 开始时间（秒），-1 表示从头开始
+     * @param endTimeSec   结束时间（秒），-1 表示到结尾
+     * @param callback     回调
+     */
+    public static void extractAudio(String inputPath, String outputPath,
+                                    String format, int bitrate, int sampleRate,
+                                    double startTimeSec, double endTimeSec,
+                                    Callback callback) {
         Log.d(TAG, "开始提取音频, CPU核心数: " + CPU_CORES);
-        String command = buildCommand(inputPath, outputPath, format, bitrate, sampleRate);
+        if (startTimeSec >= 0) Log.d(TAG, "开始时间: " + startTimeSec + "秒");
+        if (endTimeSec >= 0) Log.d(TAG, "结束时间: " + endTimeSec + "秒");
+        String command = buildCommand(inputPath, outputPath, format, bitrate, sampleRate,
+                startTimeSec, endTimeSec);
         Log.d(TAG, "FFmpeg command: " + command);
 
         // 同步获取视频总时长（在后台线程调用，不会阻塞 UI）
         double durationSec = getDurationSync(inputPath);
         Log.d(TAG, "视频时长: " + durationSec + "秒");
+
+        // 计算实际提取区间时长（用于进度计算）
+        double extractDurationSec = durationSec;
+        if (startTimeSec >= 0 && endTimeSec >= 0 && endTimeSec > startTimeSec) {
+            extractDurationSec = endTimeSec - startTimeSec;
+        } else if (startTimeSec >= 0 && durationSec > startTimeSec) {
+            extractDurationSec = durationSec - startTimeSec;
+        } else if (endTimeSec >= 0 && endTimeSec <= durationSec) {
+            extractDurationSec = endTimeSec;
+        }
+        Log.d(TAG, "提取区间时长: " + extractDurationSec + "秒");
 
         FFmpegKit.executeAsync(command, session -> {
             Log.d(TAG, "FFmpeg 完成, Return code: " + session.getReturnCode());
@@ -76,16 +110,15 @@ public class AudioExtractor {
                 Log.v(TAG, String.format("statistics: time=%.2f, speed=%.2f",
                         currentTime, speed));
 
-                if (currentTime > 0 && durationSec > 0) {
-                    // 有总时长：显示百分比进度和 ETA
-                    int progress = (int) Math.min(100, (currentTime * 100.0 / durationSec));
+                if (currentTime > 0 && extractDurationSec > 0) {
+                    int progress = (int) Math.min(100, (currentTime * 100.0 / extractDurationSec));
                     callback.onProgress(progress);
 
                     if (speed > 0) {
-                        String eta = formatEta(currentTime, durationSec, speed);
+                        String eta = formatEta(currentTime, extractDurationSec, speed);
                         if (eta != null) callback.onEtaUpdate(eta);
                     }
-                } else if (currentTime > 0 && durationSec <= 0) {
+                } else if (currentTime > 0 && extractDurationSec <= 0) {
                     // 时长未知：根据已处理时间估算进度（假设最大 10 分钟）
                     int estimatedProgress = (int) Math.min(95, (currentTime * 100.0 / 600.0));
                     callback.onProgress(estimatedProgress);
@@ -147,44 +180,56 @@ public class AudioExtractor {
     }
 
     /**
-     * 构建 FFmpeg 命令
+     * 构建 FFmpeg 命令（支持时间区间）
+     *
+     * 时间区间通过 -ss（开始）和 -to（结束）实现，放在 -i 之前实现快速定位
      */
     private static String buildCommand(String inputPath, String outputPath,
-                                       String format, int bitrate, int sampleRate) {
+                                       String format, int bitrate, int sampleRate,
+                                       double startTimeSec, double endTimeSec) {
         String quotedInput = quotePath(inputPath);
         String quotedOutput = quotePath(outputPath);
         String threads = String.valueOf(CPU_CORES);
 
+        // 构建时间参数
+        String timeParams = "";
+        if (startTimeSec >= 0) {
+            timeParams += String.format("-ss %.3f ", startTimeSec);
+        }
+        if (endTimeSec >= 0) {
+            timeParams += String.format("-to %.3f ", endTimeSec);
+        }
+
         switch (format.toLowerCase()) {
             case "mp3":
                 return String.format(
-                        "-y -threads %s -i %s -map 0:a -vn -c:a libmp3lame -b:a %d -ar %d -preset fast %s",
-                        threads, quotedInput, bitrate, sampleRate, quotedOutput);
+                        "-y -threads %s %s-i %s -map 0:a -vn -c:a libmp3lame -b:a %d -ar %d -preset fast %s",
+                        threads, timeParams, quotedInput, bitrate, sampleRate, quotedOutput);
 
             case "aac":
                 return String.format(
-                        "-y -threads %s -i %s -map 0:a -vn -c:a aac -b:a %d -ar %d -movflags +faststart %s",
-                        threads, quotedInput, bitrate, sampleRate, quotedOutput);
+                        "-y -threads %s %s-i %s -map 0:a -vn -c:a aac -b:a %d -ar %d -movflags +faststart %s",
+                        threads, timeParams, quotedInput, bitrate, sampleRate, quotedOutput);
 
             case "wav":
                 return String.format(
-                        "-y -threads %s -i %s -map 0:a -vn -c:a pcm_s16le -ar %d %s",
-                        threads, quotedInput, sampleRate, quotedOutput);
+                        "-y -threads %s %s-i %s -map 0:a -vn -c:a pcm_s16le -ar %d %s",
+                        threads, timeParams, quotedInput, sampleRate, quotedOutput);
 
             case "flac":
                 return String.format(
-                        "-y -threads %s -i %s -map 0:a -vn -c:a flac -ar %d -compression_level 1 %s",
-                        threads, quotedInput, sampleRate, quotedOutput);
+                        "-y -threads %s %s-i %s -map 0:a -vn -c:a flac -ar %d -compression_level 1 %s",
+                        threads, timeParams, quotedInput, sampleRate, quotedOutput);
 
             case "m4a":
                 return String.format(
-                        "-y -threads %s -i %s -map 0:a -vn -c:a aac -b:a %d -ar %d -movflags +faststart %s",
-                        threads, quotedInput, bitrate, sampleRate, quotedOutput);
+                        "-y -threads %s %s-i %s -map 0:a -vn -c:a aac -b:a %d -ar %d -movflags +faststart %s",
+                        threads, timeParams, quotedInput, bitrate, sampleRate, quotedOutput);
 
             default:
                 return String.format(
-                        "-y -threads %s -i %s -map 0:a -vn -c:a libmp3lame -b:a %d -ar %d -preset fast %s",
-                        threads, quotedInput, bitrate, sampleRate, quotedOutput);
+                        "-y -threads %s %s-i %s -map 0:a -vn -c:a libmp3lame -b:a %d -ar %d -preset fast %s",
+                        threads, timeParams, quotedInput, bitrate, sampleRate, quotedOutput);
         }
     }
 

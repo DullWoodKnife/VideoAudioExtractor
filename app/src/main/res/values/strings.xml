@@ -44,6 +44,13 @@
     <string name="label_bitrate">比特率</string>
     <string name="label_sample_rate">采样率</string>
 
+    <!-- 区间剪辑 -->
+    <string name="section_trim_title">音频区间剪辑</string>
+    <string name="section_trim_subtitle">设置开始和结束时间，仅提取指定区间的音频（留空则提取全部）</string>
+    <string name="label_start_time">开始时间</string>
+    <string name="label_end_time">结束时间</string>
+    <string name="trim_hint">格式：时:分:秒，留空表示从头/到尾</string>
+
     <!-- 提取处理 -->
     <string name="section_extract_title">开始提取</string>
     <string name="btn_extract">开始提取音频</string>

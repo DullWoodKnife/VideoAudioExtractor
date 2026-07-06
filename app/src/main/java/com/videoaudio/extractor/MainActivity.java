@@ -64,6 +64,12 @@ public class MainActivity extends AppCompatActivity {
     private MaterialButton btnSave;
     private EditText etOutputFilename;
     private TextView tvFilenameExtension;
+    private EditText etTrimStartHour;
+    private EditText etTrimStartMin;
+    private EditText etTrimStartSec;
+    private EditText etTrimEndHour;
+    private EditText etTrimEndMin;
+    private EditText etTrimEndSec;
 
     // ========== 格式卡片 ==========
     private final Map<String, LinearLayout> formatCards = new HashMap<>();
@@ -140,6 +146,12 @@ public class MainActivity extends AppCompatActivity {
         btnSave = findViewById(R.id.btn_save);
         etOutputFilename = findViewById(R.id.et_output_filename);
         tvFilenameExtension = findViewById(R.id.tv_filename_extension);
+        etTrimStartHour = findViewById(R.id.et_trim_start_hour);
+        etTrimStartMin = findViewById(R.id.et_trim_start_min);
+        etTrimStartSec = findViewById(R.id.et_trim_start_sec);
+        etTrimEndHour = findViewById(R.id.et_trim_end_hour);
+        etTrimEndMin = findViewById(R.id.et_trim_end_min);
+        etTrimEndSec = findViewById(R.id.et_trim_end_sec);
     }
 
     /**
@@ -329,7 +341,21 @@ public class MainActivity extends AppCompatActivity {
                 int bitrate = BITRATE_MAP.getOrDefault(bitrateStr, 192000);
                 int sampleRate = SAMPLE_RATE_MAP.getOrDefault(sampleRateStr, 44100);
 
-                // 4. 执行 FFmpeg 提取
+                // 4. 获取用户设置的时间区间
+                double startTimeSec = parseTrimTime(etTrimStartHour, etTrimStartMin, etTrimStartSec);
+                double endTimeSec = parseTrimTime(etTrimEndHour, etTrimEndMin, etTrimEndSec);
+
+                // 校验时间区间
+                if (startTimeSec >= 0 && endTimeSec >= 0 && endTimeSec <= startTimeSec) {
+                    runOnUiThread(() -> {
+                        setBusyState(false);
+                        layoutProgress.setVisibility(View.GONE);
+                        Toast.makeText(MainActivity.this, "结束时间必须大于开始时间", Toast.LENGTH_SHORT).show();
+                    });
+                    return;
+                }
+
+                // 5. 执行 FFmpeg 提取
                 runOnUiThread(() -> {
                     tvProgressStatus.setText(getString(R.string.status_extracting));
                     progressBar.setIndeterminate(false);
@@ -383,6 +409,8 @@ public class MainActivity extends AppCompatActivity {
                         selectedFormat,
                         bitrate,
                         sampleRate,
+                        startTimeSec,
+                        endTimeSec,
                         callback
                 );
 
@@ -493,5 +521,27 @@ public class MainActivity extends AppCompatActivity {
             return String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds);
         }
         return String.format(Locale.getDefault(), "%d:%02d", minutes, seconds);
+    }
+
+    /**
+     * 解析时间区间输入框的值
+     *
+     * @return 秒数，如果所有字段都为空则返回 -1（表示不限制）
+     */
+    private double parseTrimTime(EditText etHour, EditText etMin, EditText etSec) {
+        String hourStr = etHour.getText().toString().trim();
+        String minStr = etMin.getText().toString().trim();
+        String secStr = etSec.getText().toString().trim();
+
+        // 所有字段都为空表示不限制
+        if (hourStr.isEmpty() && minStr.isEmpty() && secStr.isEmpty()) {
+            return -1;
+        }
+
+        int hour = hourStr.isEmpty() ? 0 : Integer.parseInt(hourStr);
+        int min = minStr.isEmpty() ? 0 : Integer.parseInt(minStr);
+        int sec = secStr.isEmpty() ? 0 : Integer.parseInt(secStr);
+
+        return hour * 3600 + min * 60 + sec;
     }
 }
