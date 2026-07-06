@@ -3,8 +3,8 @@ package com.videoaudio.extractor;
 import android.util.Log;
 
 import com.arthenica.ffmpegkit.FFmpegKit;
-import com.arthenica.ffmpegkit.Level;
 import com.arthenica.ffmpegkit.ReturnCode;
+import com.arthenica.ffmpegkit.Statistics;
 
 import java.io.File;
 import java.util.regex.Matcher;
@@ -13,10 +13,9 @@ import java.util.regex.Pattern;
 /**
  * 音频提取工具类
  *
- * 进度方案：从 FFmpeg 执行日志中提取 Duration 和 time= 来计算进度
- * - 不依赖 ffprobe 预查询（某些文件格式 ffprobe 可能失败）
- * - 不依赖 statistics 回调（某些 fork 不可靠）
- * - 仅依赖 LogCallback（所有版本都支持）
+ * 进度方案：
+ * 1. statistics 回调为主（已确认 com.mrljdx fork 完整支持 getTime/getSpeed）
+ * 2. log 回调中解析 Duration: 获取总时长（备用）
  */
 public class AudioExtractor {
 
@@ -24,14 +23,8 @@ public class AudioExtractor {
 
     private static final int CPU_CORES = Runtime.getRuntime().availableProcessors();
 
-    // 匹配 FFmpeg 启动时的输入信息行：Duration: HH:MM:SS.MM
+    // 匹配 FFmpeg 输入探测阶段的 Duration: HH:MM:SS.MM
     private static final Pattern DURATION_PATTERN = Pattern.compile("Duration: (\\d{1,2}):(\\d{2}):(\\d{2})\\.(\\d+)");
-
-    // 匹配 FFmpeg 进度日志中的 time=HH:MM:SS.xx
-    private static final Pattern TIME_PATTERN = Pattern.compile("time=(\\d{1,2}):(\\d{2}):(\\d{2})\\.(\\d+)");
-
-    // 匹配 FFmpeg 日志中的 speed= 字段
-    private static final Pattern SPEED_PATTERN = Pattern.compile("speed=([\\d.]+)x");
 
     /**
      * 提取音频的回调接口
@@ -53,11 +46,10 @@ public class AudioExtractor {
         String command = buildCommand(inputPath, outputPath, format, bitrate, sampleRate);
         Log.d(TAG, "FFmpeg command: " + command);
 
-        // 在 log 回调中捕获视频总时长
         final double[] durationSec = {0};
 
         FFmpegKit.executeAsync(command, session -> {
-            Log.d(TAG, "FFmpeg session completed. Return code: " + session.getReturnCode());
+            Log.d(TAG, "FFmpeg 完成, Return code: " + session.getReturnCode());
 
             if (ReturnCode.isSuccess(session.getReturnCode())) {
                 callback.onProgress(100);
@@ -77,120 +69,73 @@ public class AudioExtractor {
                 callback.onFailure(failMsg);
             }
         }, log -> {
+            // 从日志中捕获视频总时长
             try {
                 String message = log.getMessage();
-                if (message == null) return;
+                if (message == null || durationSec[0] > 0) return;
 
-                Level level = log.getLevel();
-
-                // 1. 从输入探测阶段捕获 Duration
-                if (durationSec[0] <= 0 && level == Level.AV_LOG_INFO) {
-                    Matcher durationMatcher = DURATION_PATTERN.matcher(message);
-                    if (durationMatcher.find()) {
-                        try {
-                            int h = Integer.parseInt(durationMatcher.group(1));
-                            int m = Integer.parseInt(durationMatcher.group(2));
-                            int s = Integer.parseInt(durationMatcher.group(3));
-                            String frac = durationMatcher.group(4);
-                            double fracVal = frac.length() <= 2
-                                    ? Integer.parseInt(frac) / Math.pow(10, frac.length())
-                                    : Double.parseDouble("0." + frac);
-                            durationSec[0] = h * 3600 + m * 60 + s + fracVal;
-                            Log.d(TAG, "从日志获取视频时长: " + durationSec[0] + "秒");
-                        } catch (NumberFormatException e) {
-                            Log.w(TAG, "解析 Duration 失败");
-                        }
-                    }
-                }
-
-                // 2. 从进度行计算进度百分比和 ETA
-                int timeIdx = message.indexOf("time=");
-                if (timeIdx >= 0 && durationSec[0] > 0) {
-                    Matcher timeMatcher = TIME_PATTERN.matcher(message);
-                    if (timeMatcher.find(timeIdx)) {
-                        int progress = parseProgress(timeMatcher, durationSec[0]);
-                        if (progress >= 0 && progress <= 100) {
-                            callback.onProgress(progress);
-                        }
-
-                        String eta = parseEta(timeMatcher, message, durationSec[0]);
-                        if (eta != null) {
-                            callback.onEtaUpdate(eta);
-                        }
+                Matcher matcher = DURATION_PATTERN.matcher(message);
+                if (matcher.find()) {
+                    try {
+                        int h = Integer.parseInt(matcher.group(1));
+                        int m = Integer.parseInt(matcher.group(2));
+                        int s = Integer.parseInt(matcher.group(3));
+                        String frac = matcher.group(4);
+                        double fracVal = frac.length() <= 2
+                                ? Integer.parseInt(frac) / Math.pow(10, frac.length())
+                                : Double.parseDouble("0." + frac);
+                        durationSec[0] = h * 3600 + m * 60 + s + fracVal;
+                        Log.d(TAG, "从日志获取视频时长: " + durationSec[0] + "秒");
+                    } catch (NumberFormatException ignored) {
                     }
                 }
             } catch (Exception e) {
-                // 防止回调异常中断 FFmpeg 执行
                 Log.w(TAG, "解析日志异常: " + e.getMessage());
             }
         }, statistics -> {
-            // 备用：statistics 回调（部分版本可能支持）
-            if (durationSec[0] > 0 && statistics.getTime() > 0) {
-                int progress = (int) Math.min(100,
-                        (statistics.getTime() * 100.0 / durationSec[0]));
-                callback.onProgress(progress);
+            // statistics 回调：计算进度和 ETA
+            try {
+                double currentTime = statistics.getTime();
+                double speed = statistics.getSpeed();
+
+                Log.v(TAG, String.format("statistics: time=%.2f, speed=%.2f, bitrate=%.2f",
+                        currentTime, speed, statistics.getBitrate()));
+
+                if (durationSec[0] > 0 && currentTime > 0) {
+                    int progress = (int) Math.min(100, (currentTime * 100.0 / durationSec[0]));
+                    callback.onProgress(progress);
+
+                    if (speed > 0) {
+                        String eta = formatEta(currentTime, durationSec[0], speed);
+                        if (eta != null) callback.onEtaUpdate(eta);
+                    }
+                } else if (currentTime > 0 && durationSec[0] <= 0) {
+                    // 时长未知时仍显示处理时间
+                    callback.onEtaUpdate(String.format("已处理 %.0f秒...", currentTime));
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "statistics回调异常: " + e.getMessage());
             }
         });
     }
 
     /**
-     * 根据已匹配的 time= 数据计算进度
+     * 格式化 ETA 文字
      */
-    private static int parseProgress(Matcher timeMatcher, double totalDuration) {
-        try {
-            int h = Integer.parseInt(timeMatcher.group(1));
-            int m = Integer.parseInt(timeMatcher.group(2));
-            int s = Integer.parseInt(timeMatcher.group(3));
-            String frac = timeMatcher.group(4);
-            double fracVal = frac.length() <= 2
-                    ? Integer.parseInt(frac) / Math.pow(10, frac.length())
-                    : Double.parseDouble("0." + frac);
-            double current = h * 3600 + m * 60 + s + fracVal;
-            return (int) Math.min(100, (current * 100.0 / totalDuration));
-        } catch (NumberFormatException e) {
-            return -1;
+    private static String formatEta(double processedSec, double totalSec, double speed) {
+        if (processedSec >= totalSec) return "即将完成";
+
+        double remainSec = (totalSec - processedSec) / speed;
+        if (remainSec < 1) return "即将完成";
+        if (remainSec < 60) return String.format("剩余 %d秒", (int) remainSec);
+        if (remainSec < 3600) {
+            int min = (int) (remainSec / 60);
+            int sec = (int) (remainSec % 60);
+            return String.format("剩余 %d分%02d秒", min, sec);
         }
-    }
-
-    /**
-     * 根据已匹配的 time= 和 speed= 数据计算 ETA
-     */
-    private static String parseEta(Matcher timeMatcher, String fullText, double totalDuration) {
-        int speedIdx = fullText.indexOf("speed=");
-        if (speedIdx < 0) return null;
-
-        Matcher speedMatcher = SPEED_PATTERN.matcher(fullText);
-        if (!speedMatcher.find(speedIdx)) return null;
-
-        try {
-            int h = Integer.parseInt(timeMatcher.group(1));
-            int m = Integer.parseInt(timeMatcher.group(2));
-            int s = Integer.parseInt(timeMatcher.group(3));
-            String frac = timeMatcher.group(4);
-            double fracVal = frac.length() <= 2
-                    ? Integer.parseInt(frac) / Math.pow(10, frac.length())
-                    : Double.parseDouble("0." + frac);
-            double processed = h * 3600 + m * 60 + s + fracVal;
-
-            double speed = Double.parseDouble(speedMatcher.group(1));
-            if (speed <= 0 || processed <= 0 || processed >= totalDuration) {
-                return processed >= totalDuration ? "即将完成" : null;
-            }
-
-            double remain = (totalDuration - processed) / speed;
-            if (remain < 1) return "即将完成";
-            if (remain < 60) return String.format("剩余 %d秒", (int) remain);
-            if (remain < 3600) {
-                int min = (int) (remain / 60);
-                int sec = (int) (remain % 60);
-                return String.format("剩余 %d分%02d秒", min, sec);
-            }
-            int hour = (int) (remain / 3600);
-            int min = (int) ((remain % 3600) / 60);
-            return String.format("剩余 %d小时%d分", hour, min);
-        } catch (NumberFormatException e) {
-            return null;
-        }
+        int hour = (int) (remainSec / 3600);
+        int min = (int) ((remainSec % 3600) / 60);
+        return String.format("剩余 %d小时%d分", hour, min);
     }
 
     /**

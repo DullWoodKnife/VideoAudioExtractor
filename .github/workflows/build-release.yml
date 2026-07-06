@@ -2,14 +2,16 @@ name: Build Release APK
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
     inputs:
       tag:
         description: '版本标签 (如 v1.0.0)'
-        required: true
-        default: 'v1.0.0'
+        required: false
+        default: ''
 
 jobs:
   build:
@@ -68,10 +70,15 @@ jobs:
       - name: Get version info
         id: version
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ "${{ github.event_name }}" == "push" ]] && [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && [[ -n "${{ github.event.inputs.tag }}" ]]; then
             echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
           else
-            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            # push to main: 从 build.gradle 提取 versionName
+            VERSION=$(grep 'versionName' app/build.gradle | head -1 | sed "s/.*versionName \"\(.*\)\".*/\1/")
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            echo "TAG=v${VERSION}-${SHORT_SHA}" >> $GITHUB_OUTPUT
           fi
 
       - name: Rename APK
