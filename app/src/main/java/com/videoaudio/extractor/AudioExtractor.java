@@ -68,16 +68,16 @@ public class AudioExtractor {
         double durationSec = getDurationSync(inputPath);
         Log.d(TAG, "视频时长: " + durationSec + "秒");
 
-        // 计算实际提取区间时长（用于进度计算）
-        double extractDurationSec = durationSec;
+        // 计算实际提取区间时长（用于进度计算，用 final 数组以便 lambda 引用）
+        final double[] extractDuration = {durationSec};
         if (startTimeSec >= 0 && endTimeSec >= 0 && endTimeSec > startTimeSec) {
-            extractDurationSec = endTimeSec - startTimeSec;
+            extractDuration[0] = endTimeSec - startTimeSec;
         } else if (startTimeSec >= 0 && durationSec > startTimeSec) {
-            extractDurationSec = durationSec - startTimeSec;
+            extractDuration[0] = durationSec - startTimeSec;
         } else if (endTimeSec >= 0 && endTimeSec <= durationSec) {
-            extractDurationSec = endTimeSec;
+            extractDuration[0] = endTimeSec;
         }
-        Log.d(TAG, "提取区间时长: " + extractDurationSec + "秒");
+        Log.d(TAG, "提取区间时长: " + extractDuration[0] + "秒");
 
         FFmpegKit.executeAsync(command, session -> {
             Log.d(TAG, "FFmpeg 完成, Return code: " + session.getReturnCode());
@@ -110,15 +110,15 @@ public class AudioExtractor {
                 Log.v(TAG, String.format("statistics: time=%.2f, speed=%.2f",
                         currentTime, speed));
 
-                if (currentTime > 0 && extractDurationSec > 0) {
-                    int progress = (int) Math.min(100, (currentTime * 100.0 / extractDurationSec));
+                if (currentTime > 0 && extractDuration[0] > 0) {
+                    int progress = (int) Math.min(100, (currentTime * 100.0 / extractDuration[0]));
                     callback.onProgress(progress);
 
                     if (speed > 0) {
-                        String eta = formatEta(currentTime, extractDurationSec, speed);
+                        String eta = formatEta(currentTime, extractDuration[0], speed);
                         if (eta != null) callback.onEtaUpdate(eta);
                     }
-                } else if (currentTime > 0 && extractDurationSec <= 0) {
+                } else if (currentTime > 0 && extractDuration[0] <= 0) {
                     // 时长未知：根据已处理时间估算进度（假设最大 10 分钟）
                     int estimatedProgress = (int) Math.min(95, (currentTime * 100.0 / 600.0));
                     callback.onProgress(estimatedProgress);
