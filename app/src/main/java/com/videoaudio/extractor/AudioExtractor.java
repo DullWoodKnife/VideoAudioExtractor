@@ -3,28 +3,23 @@ package com.videoaudio.extractor;
 import android.util.Log;
 
 import com.arthenica.ffmpegkit.FFmpegKit;
+import com.arthenica.ffmpegkit.FFmpegSession;
 import com.arthenica.ffmpegkit.ReturnCode;
-import com.arthenica.ffmpegkit.Statistics;
 
 import java.io.File;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 音频提取工具类
  *
  * 进度方案：
- * 1. statistics 回调为主（已确认 com.mrljdx fork 完整支持 getTime/getSpeed）
- * 2. log 回调中解析 Duration: 获取总时长（备用）
+ * 1. 同步执行 ffprobe 获取视频总时长（最可靠）
+ * 2. statistics 回调实时更新进度（getTime 返回秒，getSpeed 返回倍速）
  */
 public class AudioExtractor {
 
     private static final String TAG = "AudioExtractor";
 
     private static final int CPU_CORES = Runtime.getRuntime().availableProcessors();
-
-    // 匹配 FFmpeg 输入探测阶段的 Duration: HH:MM:SS.MM
-    private static final Pattern DURATION_PATTERN = Pattern.compile("Duration: (\\d{1,2}):(\\d{2}):(\\d{2})\\.(\\d+)");
 
     /**
      * 提取音频的回调接口
@@ -46,7 +41,9 @@ public class AudioExtractor {
         String command = buildCommand(inputPath, outputPath, format, bitrate, sampleRate);
         Log.d(TAG, "FFmpeg command: " + command);
 
-        final double[] durationSec = {0};
+        // 同步获取视频总时长（在后台线程调用，不会阻塞 UI）
+        double durationSec = getDurationSync(inputPath);
+        Log.d(TAG, "视频时长: " + durationSec + "秒");
 
         FFmpegKit.executeAsync(command, session -> {
             Log.d(TAG, "FFmpeg 完成, Return code: " + session.getReturnCode());
@@ -69,54 +66,65 @@ public class AudioExtractor {
                 callback.onFailure(failMsg);
             }
         }, log -> {
-            // 从日志中捕获视频总时长
-            try {
-                String message = log.getMessage();
-                if (message == null || durationSec[0] > 0) return;
-
-                Matcher matcher = DURATION_PATTERN.matcher(message);
-                if (matcher.find()) {
-                    try {
-                        int h = Integer.parseInt(matcher.group(1));
-                        int m = Integer.parseInt(matcher.group(2));
-                        int s = Integer.parseInt(matcher.group(3));
-                        String frac = matcher.group(4);
-                        double fracVal = frac.length() <= 2
-                                ? Integer.parseInt(frac) / Math.pow(10, frac.length())
-                                : Double.parseDouble("0." + frac);
-                        durationSec[0] = h * 3600 + m * 60 + s + fracVal;
-                        Log.d(TAG, "从日志获取视频时长: " + durationSec[0] + "秒");
-                    } catch (NumberFormatException ignored) {
-                    }
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "解析日志异常: " + e.getMessage());
-            }
+            // 仅输出日志，不做进度解析
+            Log.v(TAG, log.getMessage());
         }, statistics -> {
-            // statistics 回调：计算进度和 ETA
             try {
                 double currentTime = statistics.getTime();
                 double speed = statistics.getSpeed();
 
-                Log.v(TAG, String.format("statistics: time=%.2f, speed=%.2f, bitrate=%.2f",
-                        currentTime, speed, statistics.getBitrate()));
+                Log.v(TAG, String.format("statistics: time=%.2f, speed=%.2f",
+                        currentTime, speed));
 
-                if (durationSec[0] > 0 && currentTime > 0) {
-                    int progress = (int) Math.min(100, (currentTime * 100.0 / durationSec[0]));
+                if (currentTime > 0 && durationSec > 0) {
+                    // 有总时长：显示百分比进度和 ETA
+                    int progress = (int) Math.min(100, (currentTime * 100.0 / durationSec));
                     callback.onProgress(progress);
 
                     if (speed > 0) {
-                        String eta = formatEta(currentTime, durationSec[0], speed);
+                        String eta = formatEta(currentTime, durationSec, speed);
                         if (eta != null) callback.onEtaUpdate(eta);
                     }
-                } else if (currentTime > 0 && durationSec[0] <= 0) {
-                    // 时长未知时仍显示处理时间
+                } else if (currentTime > 0 && durationSec <= 0) {
+                    // 时长未知：根据已处理时间估算进度（假设最大 10 分钟）
+                    int estimatedProgress = (int) Math.min(95, (currentTime * 100.0 / 600.0));
+                    callback.onProgress(estimatedProgress);
                     callback.onEtaUpdate(String.format("已处理 %.0f秒...", currentTime));
                 }
             } catch (Exception e) {
                 Log.w(TAG, "statistics回调异常: " + e.getMessage());
             }
         });
+    }
+
+    /**
+     * 同步执行 ffprobe 获取视频时长（秒）
+     *
+     * @return 视频时长（秒），获取失败返回 0
+     */
+    private static double getDurationSync(String inputPath) {
+        String probeCommand = String.format(
+                "-v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 %s",
+                quotePath(inputPath));
+
+        try {
+            FFmpegSession probeSession = FFmpegKit.execute(probeCommand);
+            if (ReturnCode.isSuccess(probeSession.getReturnCode())) {
+                String output = probeSession.getOutput();
+                if (output != null && !output.isEmpty()) {
+                    double duration = Double.parseDouble(output.trim());
+                    Log.d(TAG, "ffprobe 获取时长成功: " + duration + "秒");
+                    return duration;
+                }
+            } else {
+                Log.w(TAG, "ffprobe 返回码: " + probeSession.getReturnCode());
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "ffprobe 执行异常: " + e.getMessage());
+        }
+
+        Log.w(TAG, "ffprobe 获取时长失败，进度将使用估算值");
+        return 0;
     }
 
     /**

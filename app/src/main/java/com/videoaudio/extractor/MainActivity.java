@@ -339,6 +339,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onProgress(int progress) {
                         runOnUiThread(() -> {
+                            progressBar.setIndeterminate(false);
                             progressBar.setProgress(progress);
                             tvProgressPercent.setText(progress + "%");
                         });
