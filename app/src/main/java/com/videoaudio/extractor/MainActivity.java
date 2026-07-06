@@ -56,6 +56,7 @@ public class MainActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private TextView tvProgressPercent;
     private TextView tvProgressStatus;
+    private TextView tvProgressEta;
     private LinearLayout layoutComplete;
     private TextView tvOutputInfo;
     private MaterialButton btnPlay;
@@ -131,6 +132,7 @@ public class MainActivity extends AppCompatActivity {
         progressBar = findViewById(R.id.progress_bar);
         tvProgressPercent = findViewById(R.id.tv_progress_percent);
         tvProgressStatus = findViewById(R.id.tv_progress_status);
+        tvProgressEta = findViewById(R.id.tv_progress_eta);
         layoutComplete = findViewById(R.id.layout_complete);
         tvOutputInfo = findViewById(R.id.tv_output_info);
         btnPlay = findViewById(R.id.btn_play);
@@ -296,6 +298,7 @@ public class MainActivity extends AppCompatActivity {
         progressBar.setIndeterminate(true);
         progressBar.setProgress(0);
         tvProgressPercent.setText("0%");
+        tvProgressEta.setText("");
 
         new Thread(() -> {
             try {
@@ -338,6 +341,13 @@ public class MainActivity extends AppCompatActivity {
                         runOnUiThread(() -> {
                             progressBar.setProgress(progress);
                             tvProgressPercent.setText(progress + "%");
+                        });
+                    }
+
+                    @Override
+                    public void onEtaUpdate(String etaText) {
+                        runOnUiThread(() -> {
+                            tvProgressEta.setText(etaText);
                         });
                     }
 
