@@ -2,6 +2,10 @@
 <resources>
     <string name="app_name">视频音频提取器</string>
 
+    <!-- 模式切换 -->
+    <string name="mode_audio">音频提取</string>
+    <string name="mode_video">视频转换</string>
+
     <!-- 上传区域 -->
     <string name="section_upload_title">选择视频文件</string>
     <string name="section_upload_subtitle">支持 MP4、AVI、MOV、MKV、WMV、FLV、WEBM、3GP 等多种视频格式</string>
@@ -72,8 +76,8 @@
     <string name="section_features_title">功能特点</string>
     <string name="feature_bullet">&#8226;</string>
     <string name="feature_1">完全免费使用，无需注册</string>
-    <string name="feature_2">支持5种音频格式提取 (MP3、AAC、WAV、FLAC、M4A)</string>
-    <string name="feature_3">保持原音频质量，可自定义比特率和采样率</string>
+    <string name="feature_2">支持5种音频格式提取和6种视频格式互转</string>
+    <string name="feature_3">可自定义比特率、采样率及音频区间剪辑</string>
     <string name="feature_4">本地处理，文件不上传服务器，安全可靠</string>
 
     <!-- 设置 -->
@@ -104,5 +108,22 @@
         <item>44100 Hz（CD品质）</item>
         <item>48000 Hz（DVD品质）</item>
         <item>22050 Hz（语音）</item>
+    </string-array>
+
+    <!-- 视频格式转换 -->
+    <string name="section_video_format_title">选择目标视频格式</string>
+    <string name="section_video_format_subtitle">支持 MP4、MKV、MOV、AVI、WEBM、FLV 等格式互转</string>
+    <string name="label_video_format">目标格式</string>
+    <string name="btn_convert">开始转换视频</string>
+    <string name="status_converting">正在转换视频…</string>
+
+    <!-- 视频格式选项 -->
+    <string-array name="video_format_options">
+        <item>MP4 (H.264) - 推荐</item>
+        <item>MKV (H.264)</item>
+        <item>MOV (H.264)</item>
+        <item>AVI (MPEG4)</item>
+        <item>WEBM (VP9)</item>
+        <item>FLV (H.264)</item>
     </string-array>
 </resources>

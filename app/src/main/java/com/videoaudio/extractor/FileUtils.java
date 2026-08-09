@@ -18,6 +18,9 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * 文件操作工具类
@@ -26,6 +29,11 @@ import java.nio.channels.FileChannel;
 public class FileUtils {
 
     private static final String MIME_AUDIO_PREFIX = "audio/";
+    private static final String MIME_VIDEO_PREFIX = "video/";
+
+    private static final Set<String> VIDEO_FORMATS = new HashSet<>(Arrays.asList(
+            "mp4", "mkv", "mov", "avi", "webm", "flv"
+    ));
 
     /**
      * 将 URI 内容复制到应用缓存目录（性能优化版）
@@ -147,7 +155,7 @@ public class FileUtils {
             intent.setType(mimeType != null ? mimeType : getMimeType(file));
             intent.putExtra(Intent.EXTRA_STREAM, uri);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            context.startActivity(Intent.createChooser(intent, "分享音频文件"));
+            context.startActivity(Intent.createChooser(intent, "分享文件"));
         } catch (Exception e) {
             Toast.makeText(context, "无法分享文件", Toast.LENGTH_SHORT).show();
         }
@@ -212,13 +220,24 @@ public class FileUtils {
     }
 
     /**
+     * 判断格式是否为视频格式
+     */
+    public static boolean isVideoFormat(String format) {
+        return format != null && VIDEO_FORMATS.contains(format.toLowerCase());
+    }
+
+    /**
      * 获取文件的 MIME 类型
      */
     private static String getMimeType(File file) {
         String name = file.getName();
         int dot = name.lastIndexOf('.');
         if (dot > 0) {
-            return MIME_AUDIO_PREFIX + name.substring(dot + 1).toLowerCase();
+            String ext = name.substring(dot + 1).toLowerCase();
+            if (VIDEO_FORMATS.contains(ext)) {
+                return MIME_VIDEO_PREFIX + ext;
+            }
+            return MIME_AUDIO_PREFIX + ext;
         }
         return "audio/*";
     }
@@ -227,7 +246,11 @@ public class FileUtils {
      * 根据格式获取 MIME 类型
      */
     private static String getMimeType(String format) {
-        return MIME_AUDIO_PREFIX + format.toLowerCase();
+        String f = format.toLowerCase();
+        if (VIDEO_FORMATS.contains(f)) {
+            return MIME_VIDEO_PREFIX + f;
+        }
+        return MIME_AUDIO_PREFIX + f;
     }
 
     /**

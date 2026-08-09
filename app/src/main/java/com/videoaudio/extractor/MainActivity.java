@@ -21,6 +21,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.cardview.widget.CardView;
 
 import com.google.android.material.button.MaterialButton;
 
@@ -71,9 +72,28 @@ public class MainActivity extends AppCompatActivity {
     private EditText etTrimEndMin;
     private EditText etTrimEndSec;
 
+    // ========== 模式切换 ==========
+    private static final int MODE_AUDIO = 0;
+    private static final int MODE_VIDEO = 1;
+    private int currentMode = MODE_AUDIO;
+
+    private MaterialButton btnModeAudio;
+    private MaterialButton btnModeVideo;
+    private Spinner spinnerVideoFormat;
+    private LinearLayout layoutVideoSection;
+    private LinearLayout layoutFormatGrid;
+    private TextView tvAudioFormatTitle;
+    private TextView tvAudioFormatSubtitle;
+    private TextView tvQualityTitle;
+    private CardView cardQuality;
+    private TextView tvTrimTitle;
+    private TextView tvTrimSubtitle;
+    private CardView cardTrim;
+
     // ========== 格式卡片 ==========
     private final Map<String, LinearLayout> formatCards = new HashMap<>();
     private String selectedFormat = "mp3";
+    private String selectedVideoFormat = "mp4";
 
     // ========== 视频信息 ==========
     private Uri pickedVideoUri;
@@ -93,6 +113,17 @@ public class MainActivity extends AppCompatActivity {
         SAMPLE_RATE_MAP.put("44100 Hz（CD品质）", 44100);
         SAMPLE_RATE_MAP.put("48000 Hz（DVD品质）", 48000);
         SAMPLE_RATE_MAP.put("22050 Hz（语音）", 22050);
+    }
+
+    // ========== 视频格式映射 ==========
+    private static final Map<String, String> VIDEO_FORMAT_MAP = new HashMap<>();
+    static {
+        VIDEO_FORMAT_MAP.put("MP4 (H.264) - 推荐", "mp4");
+        VIDEO_FORMAT_MAP.put("MKV (H.264)", "mkv");
+        VIDEO_FORMAT_MAP.put("MOV (H.264)", "mov");
+        VIDEO_FORMAT_MAP.put("AVI (MPEG4)", "avi");
+        VIDEO_FORMAT_MAP.put("WEBM (VP9)", "webm");
+        VIDEO_FORMAT_MAP.put("FLV (H.264)", "flv");
     }
 
     // ========== 视频选择器 ==========
@@ -118,6 +149,7 @@ public class MainActivity extends AppCompatActivity {
         initViews();
         initFormatCards();
         initSpinners();
+        initVideoFormatSpinner();
         initClickListeners();
     }
 
@@ -152,6 +184,20 @@ public class MainActivity extends AppCompatActivity {
         etTrimEndHour = findViewById(R.id.et_trim_end_hour);
         etTrimEndMin = findViewById(R.id.et_trim_end_min);
         etTrimEndSec = findViewById(R.id.et_trim_end_sec);
+
+        // 模式切换组件
+        btnModeAudio = findViewById(R.id.btn_mode_audio);
+        btnModeVideo = findViewById(R.id.btn_mode_video);
+        spinnerVideoFormat = findViewById(R.id.spinner_video_format);
+        layoutVideoSection = findViewById(R.id.layout_video_section);
+        layoutFormatGrid = findViewById(R.id.layout_format_grid);
+        tvAudioFormatTitle = findViewById(R.id.tv_audio_format_title);
+        tvAudioFormatSubtitle = findViewById(R.id.tv_audio_format_subtitle);
+        tvQualityTitle = findViewById(R.id.tv_quality_title);
+        cardQuality = findViewById(R.id.card_quality);
+        tvTrimTitle = findViewById(R.id.tv_trim_title);
+        tvTrimSubtitle = findViewById(R.id.tv_trim_subtitle);
+        cardTrim = findViewById(R.id.card_trim);
     }
 
     /**
@@ -189,6 +235,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
+     * 初始化视频格式下拉选择器
+     */
+    private void initVideoFormatSpinner() {
+        ArrayAdapter<CharSequence> videoFormatAdapter = ArrayAdapter.createFromResource(
+                this, R.array.video_format_options,
+                android.R.layout.simple_spinner_item);
+        videoFormatAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerVideoFormat.setAdapter(videoFormatAdapter);
+    }
+
+    /**
      * 初始化点击事件
      */
     private void initClickListeners() {
@@ -203,7 +260,33 @@ public class MainActivity extends AppCompatActivity {
             pickVideoLauncher.launch(intent);
         });
 
-        btnExtract.setOnClickListener(v -> startExtraction());
+        // 模式切换
+        btnModeAudio.setOnClickListener(v -> switchMode(MODE_AUDIO));
+        btnModeVideo.setOnClickListener(v -> switchMode(MODE_VIDEO));
+
+        // 视频格式选择
+        spinnerVideoFormat.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String selected = (String) parent.getItemAtPosition(position);
+                selectedVideoFormat = VIDEO_FORMAT_MAP.getOrDefault(selected, "mp4");
+                if (currentMode == MODE_VIDEO) {
+                    tvFilenameExtension.setText("." + selectedVideoFormat);
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
+        btnExtract.setOnClickListener(v -> {
+            if (currentMode == MODE_VIDEO) {
+                startVideoConversion();
+            } else {
+                startExtraction();
+            }
+        });
 
         btnPlay.setOnClickListener(v -> playOutputFile());
 
@@ -244,6 +327,58 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         updateExtractButtonState();
+    }
+
+    /**
+     * 切换音频提取 / 视频转换模式
+     */
+    private void switchMode(int mode) {
+        currentMode = mode;
+        if (mode == MODE_AUDIO) {
+            // 显示音频相关区域
+            tvAudioFormatTitle.setVisibility(View.VISIBLE);
+            tvAudioFormatSubtitle.setVisibility(View.VISIBLE);
+            layoutFormatGrid.setVisibility(View.VISIBLE);
+            tvQualityTitle.setVisibility(View.VISIBLE);
+            cardQuality.setVisibility(View.VISIBLE);
+            tvTrimTitle.setVisibility(View.VISIBLE);
+            tvTrimSubtitle.setVisibility(View.VISIBLE);
+            cardTrim.setVisibility(View.VISIBLE);
+            // 隐藏视频格式区域
+            layoutVideoSection.setVisibility(View.GONE);
+            // 更新按钮样式
+            btnModeAudio.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(getColor(R.color.color_primary)));
+            btnModeAudio.setTextColor(getColor(android.R.color.white));
+            btnModeVideo.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(getColor(R.color.bg_mode_unselected)));
+            btnModeVideo.setTextColor(getColor(R.color.text_secondary));
+            // 更新按钮文字和扩展名
+            btnExtract.setText(R.string.btn_extract);
+            tvFilenameExtension.setText("." + selectedFormat);
+        } else {
+            // 隐藏音频相关区域
+            tvAudioFormatTitle.setVisibility(View.GONE);
+            tvAudioFormatSubtitle.setVisibility(View.GONE);
+            layoutFormatGrid.setVisibility(View.GONE);
+            tvQualityTitle.setVisibility(View.GONE);
+            cardQuality.setVisibility(View.GONE);
+            tvTrimTitle.setVisibility(View.GONE);
+            tvTrimSubtitle.setVisibility(View.GONE);
+            cardTrim.setVisibility(View.GONE);
+            // 显示视频格式区域
+            layoutVideoSection.setVisibility(View.VISIBLE);
+            // 更新按钮样式
+            btnModeVideo.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(getColor(R.color.color_primary)));
+            btnModeVideo.setTextColor(getColor(android.R.color.white));
+            btnModeAudio.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(getColor(R.color.bg_mode_unselected)));
+            btnModeAudio.setTextColor(getColor(R.color.text_secondary));
+            // 更新按钮文字和扩展名
+            btnExtract.setText(R.string.btn_convert);
+            tvFilenameExtension.setText("." + selectedVideoFormat);
+        }
     }
 
     /**
@@ -427,6 +562,110 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
+     * 开始视频格式转换
+     */
+    private void startVideoConversion() {
+        if (pickedVideoUri == null) {
+            Toast.makeText(this, R.string.error_no_video, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        setBusyState(true);
+        layoutProgress.setVisibility(View.VISIBLE);
+        layoutComplete.setVisibility(View.GONE);
+        tvProgressStatus.setText(R.string.status_converting);
+        progressBar.setIndeterminate(true);
+        progressBar.setProgress(0);
+        tvProgressPercent.setText("0%");
+        tvProgressEta.setText("");
+
+        new Thread(() -> {
+            try {
+                // 1. 复制视频到本地缓存
+                runOnUiThread(() -> tvProgressStatus.setText(getString(R.string.status_converting)));
+                localInputFile = FileUtils.copyUriToCache(this, pickedVideoUri, "video_input");
+
+                // 2. 构建输出文件路径
+                String baseName = FileUtils.getBaseName(queryDisplayName(pickedVideoUri));
+
+                String customName = etOutputFilename.getText().toString().trim();
+                if (!customName.isEmpty()) {
+                    int dotIdx = customName.lastIndexOf('.');
+                    if (dotIdx > 0) {
+                        customName = customName.substring(0, dotIdx);
+                    }
+                    baseName = customName;
+                }
+
+                String extension = "." + selectedVideoFormat;
+                localOutputFile = new File(getExternalFilesDir(null), baseName + extension);
+
+                // 3. 执行视频转换
+                runOnUiThread(() -> {
+                    tvProgressStatus.setText(getString(R.string.status_converting));
+                    progressBar.setIndeterminate(false);
+                });
+
+                VideoConverter.Callback callback = new VideoConverter.Callback() {
+                    @Override
+                    public void onProgress(int progress) {
+                        runOnUiThread(() -> {
+                            progressBar.setIndeterminate(false);
+                            progressBar.setProgress(progress);
+                            tvProgressPercent.setText(progress + "%");
+                        });
+                    }
+
+                    @Override
+                    public void onEtaUpdate(String etaText) {
+                        runOnUiThread(() -> tvProgressEta.setText(etaText));
+                    }
+
+                    @Override
+                    public void onSuccess(File outputFile) {
+                        runOnUiThread(() -> {
+                            setBusyState(false);
+                            layoutProgress.setVisibility(View.GONE);
+                            layoutComplete.setVisibility(View.VISIBLE);
+
+                            String size = FileUtils.formatFileSize(outputFile.length());
+                            tvOutputInfo.setText(String.format(Locale.getDefault(),
+                                    "%s (%s)", outputFile.getName(), size));
+                        });
+                    }
+
+                    @Override
+                    public void onFailure(String message) {
+                        runOnUiThread(() -> {
+                            setBusyState(false);
+                            layoutProgress.setVisibility(View.GONE);
+                            Toast.makeText(MainActivity.this,
+                                    message != null ? message : getString(R.string.error_ffmpeg_failed),
+                                    Toast.LENGTH_LONG).show();
+                        });
+                    }
+                };
+
+                VideoConverter.convertVideo(
+                        localInputFile.getAbsolutePath(),
+                        localOutputFile.getAbsolutePath(),
+                        selectedVideoFormat,
+                        callback
+                );
+
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    setBusyState(false);
+                    layoutProgress.setVisibility(View.GONE);
+                    Toast.makeText(MainActivity.this,
+                            getString(R.string.error_copy_failed) + ": " + e.getMessage(),
+                            Toast.LENGTH_LONG).show();
+                });
+            }
+        }).start();
+    }
+
+    /**
      * 播放输出文件
      */
     private void playOutputFile() {
@@ -440,7 +679,7 @@ public class MainActivity extends AppCompatActivity {
      */
     private void shareOutputFile() {
         if (localOutputFile != null && localOutputFile.exists()) {
-            FileUtils.shareFile(this, localOutputFile, "audio/*");
+            FileUtils.shareFile(this, localOutputFile, null);
         }
     }
 
@@ -449,7 +688,8 @@ public class MainActivity extends AppCompatActivity {
      */
     private void saveOutputFile() {
         if (localOutputFile != null && localOutputFile.exists()) {
-            boolean saved = FileUtils.saveToPublicDirectory(this, localOutputFile, selectedFormat);
+            String format = currentMode == MODE_VIDEO ? selectedVideoFormat : selectedFormat;
+            boolean saved = FileUtils.saveToPublicDirectory(this, localOutputFile, format);
             if (saved) {
                 Toast.makeText(this, "文件已保存到 Download 目录", Toast.LENGTH_SHORT).show();
             } else {
@@ -473,6 +713,9 @@ public class MainActivity extends AppCompatActivity {
         btnExtract.setEnabled(!busy && pickedVideoUri != null);
         spinnerBitrate.setEnabled(!busy);
         spinnerSampleRate.setEnabled(!busy);
+        spinnerVideoFormat.setEnabled(!busy);
+        btnModeAudio.setEnabled(!busy);
+        btnModeVideo.setEnabled(!busy);
     }
 
     /**

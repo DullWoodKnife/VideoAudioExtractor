@@ -35,6 +35,9 @@
     <color name="format_flac_color">#9B59B6</color>
     <color name="format_m4a_color">#F39C12</color>
 
+    <!-- 模式切换按钮 -->
+    <color name="bg_mode_unselected">#E8ECF1</color>
+
     <!-- 分割线 -->
     <color name="divider">#E5E7EB</color>
 
