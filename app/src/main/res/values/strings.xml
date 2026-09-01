@@ -83,6 +83,19 @@
     <!-- 设置 -->
     <string name="settings">设置</string>
 
+    <!-- 日志设置 -->
+    <string name="section_log_title">日志设置</string>
+    <string name="label_log_enabled">启用日志记录</string>
+    <string name="log_enabled_subtitle">关闭后将不再记录任何日志</string>
+    <string name="btn_export_logs">导出日志</string>
+    <string name="btn_clear_logs">清除日志</string>
+    <string name="log_export_success">日志已导出到 Download/VideoAudioExtractor/logs/</string>
+    <string name="log_export_failed">日志导出失败</string>
+    <string name="log_export_empty">暂无日志可导出</string>
+    <string name="log_cleared">日志已清除</string>
+    <string name="log_status_on">已开启</string>
+    <string name="log_status_off">已关闭</string>
+
     <!-- 错误提示 -->
     <string name="error_no_video">请先选择视频文件</string>
     <string name="error_no_format">请选择输出格式</string>
@@ -116,6 +129,7 @@
     <string name="label_video_format">目标格式</string>
     <string name="btn_convert">开始转换视频</string>
     <string name="status_converting">正在转换视频…</string>
+    <string name="btn_stop">强制停止</string>
 
     <!-- 视频格式选项 -->
     <string-array name="video_format_options">

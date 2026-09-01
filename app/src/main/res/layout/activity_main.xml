@@ -785,21 +785,45 @@
             android:drawablePadding="8dp"
             android:layout_marginBottom="12dp" />
 
-        <!-- 开始提取按钮 -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_extract"
+        <!-- 开始提取 / 强制停止 按钮行 -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:text="@string/btn_extract"
-            android:textSize="16sp"
-            android:textColor="@android:color/white"
-            android:enabled="false"
-            app:cornerRadius="26dp"
-            app:backgroundTint="@color/btn_extract_bg"
-            xmlns:app="http://schemas.android.com/apk/res-auto"
-            app:icon="@drawable/ic_extract"
-            app:iconGravity="textStart"
-            app:iconTint="@android:color/white" />
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="0dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_extract"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:text="@string/btn_extract"
+                android:textSize="16sp"
+                android:textColor="@android:color/white"
+                android:enabled="false"
+                app:cornerRadius="26dp"
+                app:backgroundTint="@color/btn_extract_bg"
+                xmlns:app="http://schemas.android.com/apk/res-auto"
+                app:icon="@drawable/ic_extract"
+                app:iconGravity="textStart"
+                app:iconTint="@android:color/white" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_stop"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:text="@string/btn_stop"
+                android:textSize="16sp"
+                android:textColor="@android:color/white"
+                android:visibility="gone"
+                app:cornerRadius="26dp"
+                app:backgroundTint="@color/btn_stop_bg"
+                app:icon="@android:drawable/ic_menu_close_clear_cancel"
+                app:iconGravity="textStart"
+                app:iconTint="@android:color/white" />
+        </LinearLayout>
 
         <!-- 进度区域 -->
         <LinearLayout
@@ -943,6 +967,101 @@
                     xmlns:app="http://schemas.android.com/apk/res-auto" />
             </LinearLayout>
         </LinearLayout>
+
+        <!-- 日志设置 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/section_log_title"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="4dp" />
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            xmlns:app="http://schemas.android.com/apk/res-auto">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- 日志开关 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="12dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/label_log_enabled"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/log_enabled_subtitle"
+                            android:textColor="@color/text_hint"
+                            android:textSize="12sp"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switch_log_enabled"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true" />
+                </LinearLayout>
+
+                <!-- 操作按钮 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="4dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_export_logs"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:text="@string/btn_export_logs"
+                        android:textSize="13sp"
+                        app:cornerRadius="8dp"
+                        xmlns:app="http://schemas.android.com/apk/res-auto" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_clear_logs"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
+                        android:text="@string/btn_clear_logs"
+                        android:textSize="13sp"
+                        app:cornerRadius="8dp"
+                        xmlns:app="http://schemas.android.com/apk/res-auto" />
+                </LinearLayout>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
 
         <!-- 底部功能特点 -->
         <LinearLayout

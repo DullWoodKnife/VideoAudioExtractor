@@ -24,6 +24,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.switchmaterial.SwitchMaterial;
 
 import java.io.File;
 import java.util.HashMap;
@@ -43,6 +44,8 @@ import java.util.Map;
  */
 public class MainActivity extends AppCompatActivity {
 
+    private static final String TAG = "MainActivity";
+
     // ========== UI 组件 ==========
     private ImageView ivVideoThumbnail;
     private TextView tvUploadHint;
@@ -51,6 +54,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvVideoDetail;
     private MaterialButton btnSelectVideo;
     private MaterialButton btnExtract;
+    private MaterialButton btnStop;
     private Spinner spinnerBitrate;
     private Spinner spinnerSampleRate;
     private LinearLayout layoutProgress;
@@ -89,6 +93,11 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvTrimTitle;
     private TextView tvTrimSubtitle;
     private CardView cardTrim;
+
+    // ========== 日志设置 ==========
+    private SwitchMaterial switchLogEnabled;
+    private MaterialButton btnExportLogs;
+    private MaterialButton btnClearLogs;
 
     // ========== 格式卡片 ==========
     private final Map<String, LinearLayout> formatCards = new HashMap<>();
@@ -135,22 +144,27 @@ public class MainActivity extends AppCompatActivity {
                 }
                 Uri uri = result.getData().getData();
                 if (uri == null) {
+                    AppLog.w(TAG, "视频选择返回空 URI");
                     Toast.makeText(this, R.string.error_no_video, Toast.LENGTH_SHORT).show();
                     return;
                 }
                 pickedVideoUri = uri;
+                AppLog.i(TAG, "视频已选择: " + uri);
                 onVideoSelected(uri);
             });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        AppLog.init(getApplicationContext());
+        AppLog.i(TAG, "onCreate");
         setContentView(R.layout.activity_main);
         initViews();
         initFormatCards();
         initSpinners();
         initVideoFormatSpinner();
         initClickListeners();
+        initLogSettings();
     }
 
     /**
@@ -164,6 +178,7 @@ public class MainActivity extends AppCompatActivity {
         tvVideoDetail = findViewById(R.id.tv_video_detail);
         btnSelectVideo = findViewById(R.id.btn_select_video);
         btnExtract = findViewById(R.id.btn_extract);
+        btnStop = findViewById(R.id.btn_stop);
         spinnerBitrate = findViewById(R.id.spinner_bitrate);
         spinnerSampleRate = findViewById(R.id.spinner_sample_rate);
         layoutProgress = findViewById(R.id.layout_progress);
@@ -198,6 +213,11 @@ public class MainActivity extends AppCompatActivity {
         tvTrimTitle = findViewById(R.id.tv_trim_title);
         tvTrimSubtitle = findViewById(R.id.tv_trim_subtitle);
         cardTrim = findViewById(R.id.card_trim);
+
+        // 日志设置组件
+        switchLogEnabled = findViewById(R.id.switch_log_enabled);
+        btnExportLogs = findViewById(R.id.btn_export_logs);
+        btnClearLogs = findViewById(R.id.btn_clear_logs);
     }
 
     /**
@@ -246,6 +266,46 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
+     * 初始化日志设置：同步开关状态，绑定事件
+     */
+    private void initLogSettings() {
+        // 同步开关状态
+        switchLogEnabled.setChecked(AppLog.isEnabled());
+
+        // 日志开关
+        switchLogEnabled.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            AppLog.setEnabled(isChecked);
+            AppLog.i(TAG, "日志开关: " + (isChecked ? "开启" : "关闭"));
+            Toast.makeText(this,
+                    isChecked ? R.string.log_status_on : R.string.log_status_off,
+                    Toast.LENGTH_SHORT).show();
+        });
+
+        // 导出日志
+        btnExportLogs.setOnClickListener(v -> {
+            AppLog.i(TAG, "开始导出日志");
+            new Thread(() -> {
+                String exportPath = AppLog.exportLogs(this);
+                runOnUiThread(() -> {
+                    if (exportPath != null) {
+                        Toast.makeText(this,
+                                getString(R.string.log_export_success) + "\n" + exportPath,
+                                Toast.LENGTH_LONG).show();
+                    } else {
+                        Toast.makeText(this, R.string.log_export_empty, Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }).start();
+        });
+
+        // 清除日志
+        btnClearLogs.setOnClickListener(v -> {
+            AppLog.clearLogs();
+            Toast.makeText(this, R.string.log_cleared, Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    /**
      * 初始化点击事件
      */
     private void initClickListeners() {
@@ -288,6 +348,16 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        btnStop.setOnClickListener(v -> {
+            AppLog.i(TAG, "用户点击强制停止");
+            if (currentMode == MODE_VIDEO) {
+                VideoConverter.cancel();
+            } else {
+                AudioExtractor.cancel();
+            }
+            Toast.makeText(this, R.string.status_cancelled, Toast.LENGTH_SHORT).show();
+        });
+
         btnPlay.setOnClickListener(v -> playOutputFile());
 
         btnShare.setOnClickListener(v -> shareOutputFile());
@@ -308,6 +378,7 @@ public class MainActivity extends AppCompatActivity {
         else if (id == R.id.format_m4a) format = "m4a";
 
         if (!format.isEmpty()) {
+            AppLog.d(TAG, "选择音频格式: " + format);
             updateFormatSelection(format);
         }
     }
@@ -334,6 +405,7 @@ public class MainActivity extends AppCompatActivity {
      */
     private void switchMode(int mode) {
         currentMode = mode;
+        AppLog.i(TAG, "切换模式: " + (mode == MODE_AUDIO ? "音频提取" : "视频转换"));
         if (mode == MODE_AUDIO) {
             // 显示音频相关区域
             tvAudioFormatTitle.setVisibility(View.VISIBLE);
@@ -411,6 +483,7 @@ public class MainActivity extends AppCompatActivity {
 
             tvVideoDetail.setText(String.format(Locale.getDefault(), "%s | %s | %s", duration, resolution, fileSize));
         } catch (Exception e) {
+            AppLog.w(TAG, "获取视频元数据失败", e);
             tvVideoDetail.setText(getFileSize(uri));
         }
 
@@ -434,10 +507,12 @@ public class MainActivity extends AppCompatActivity {
      */
     private void startExtraction() {
         if (pickedVideoUri == null) {
+            AppLog.w(TAG, "开始提取时未选择视频");
             Toast.makeText(this, R.string.error_no_video, Toast.LENGTH_SHORT).show();
             return;
         }
 
+        AppLog.i(TAG, "开始提取音频, 格式: " + selectedFormat);
         setBusyState(true);
         layoutProgress.setVisibility(View.VISIBLE);
         layoutComplete.setVisibility(View.GONE);
@@ -515,6 +590,8 @@ public class MainActivity extends AppCompatActivity {
 
                     @Override
                     public void onSuccess(File outputFile) {
+                        AppLog.i(TAG, "音频提取成功: " + outputFile.getAbsolutePath()
+                                + " (" + FileUtils.formatFileSize(outputFile.length()) + ")");
                         runOnUiThread(() -> {
                             setBusyState(false);
                             layoutProgress.setVisibility(View.GONE);
@@ -528,6 +605,7 @@ public class MainActivity extends AppCompatActivity {
 
                     @Override
                     public void onFailure(String message) {
+                        AppLog.e(TAG, "音频提取失败: " + message);
                         runOnUiThread(() -> {
                             setBusyState(false);
                             layoutProgress.setVisibility(View.GONE);
@@ -550,6 +628,7 @@ public class MainActivity extends AppCompatActivity {
                 );
 
             } catch (Exception e) {
+                AppLog.e(TAG, "提取流程异常", e);
                 runOnUiThread(() -> {
                     setBusyState(false);
                     layoutProgress.setVisibility(View.GONE);
@@ -566,10 +645,12 @@ public class MainActivity extends AppCompatActivity {
      */
     private void startVideoConversion() {
         if (pickedVideoUri == null) {
+            AppLog.w(TAG, "开始转换时未选择视频");
             Toast.makeText(this, R.string.error_no_video, Toast.LENGTH_SHORT).show();
             return;
         }
 
+        AppLog.i(TAG, "开始视频转换, 目标格式: " + selectedVideoFormat);
         setBusyState(true);
         layoutProgress.setVisibility(View.VISIBLE);
         layoutComplete.setVisibility(View.GONE);
@@ -623,6 +704,8 @@ public class MainActivity extends AppCompatActivity {
 
                     @Override
                     public void onSuccess(File outputFile) {
+                        AppLog.i(TAG, "视频转换成功: " + outputFile.getAbsolutePath()
+                                + " (" + FileUtils.formatFileSize(outputFile.length()) + ")");
                         runOnUiThread(() -> {
                             setBusyState(false);
                             layoutProgress.setVisibility(View.GONE);
@@ -636,6 +719,7 @@ public class MainActivity extends AppCompatActivity {
 
                     @Override
                     public void onFailure(String message) {
+                        AppLog.e(TAG, "视频转换失败: " + message);
                         runOnUiThread(() -> {
                             setBusyState(false);
                             layoutProgress.setVisibility(View.GONE);
@@ -654,6 +738,7 @@ public class MainActivity extends AppCompatActivity {
                 );
 
             } catch (Exception e) {
+                AppLog.e(TAG, "转换流程异常", e);
                 runOnUiThread(() -> {
                     setBusyState(false);
                     layoutProgress.setVisibility(View.GONE);
@@ -670,6 +755,7 @@ public class MainActivity extends AppCompatActivity {
      */
     private void playOutputFile() {
         if (localOutputFile != null && localOutputFile.exists()) {
+            AppLog.d(TAG, "播放文件: " + localOutputFile.getName());
             FileUtils.openFile(this, localOutputFile);
         }
     }
@@ -679,6 +765,7 @@ public class MainActivity extends AppCompatActivity {
      */
     private void shareOutputFile() {
         if (localOutputFile != null && localOutputFile.exists()) {
+            AppLog.d(TAG, "分享文件: " + localOutputFile.getName());
             FileUtils.shareFile(this, localOutputFile, null);
         }
     }
@@ -689,10 +776,13 @@ public class MainActivity extends AppCompatActivity {
     private void saveOutputFile() {
         if (localOutputFile != null && localOutputFile.exists()) {
             String format = currentMode == MODE_VIDEO ? selectedVideoFormat : selectedFormat;
+            AppLog.i(TAG, "保存文件到公共目录: " + localOutputFile.getName() + ", 格式: " + format);
             boolean saved = FileUtils.saveToPublicDirectory(this, localOutputFile, format);
             if (saved) {
+                AppLog.i(TAG, "文件保存成功");
                 Toast.makeText(this, "文件已保存到 Download 目录", Toast.LENGTH_SHORT).show();
             } else {
+                AppLog.e(TAG, "文件保存失败");
                 Toast.makeText(this, R.string.error_permission, Toast.LENGTH_SHORT).show();
             }
         }
@@ -716,6 +806,9 @@ public class MainActivity extends AppCompatActivity {
         spinnerVideoFormat.setEnabled(!busy);
         btnModeAudio.setEnabled(!busy);
         btnModeVideo.setEnabled(!busy);
+        
+        // 显示/隐藏强制停止按钮
+        btnStop.setVisibility(busy ? View.VISIBLE : View.GONE);
     }
 
     /**

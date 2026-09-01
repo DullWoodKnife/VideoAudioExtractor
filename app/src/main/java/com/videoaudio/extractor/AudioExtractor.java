@@ -1,7 +1,5 @@
 package com.videoaudio.extractor;
 
-import android.util.Log;
-
 import com.arthenica.ffmpegkit.FFmpegKit;
 import com.arthenica.ffmpegkit.FFmpegSession;
 import com.arthenica.ffmpegkit.ReturnCode;
@@ -21,6 +19,9 @@ public class AudioExtractor {
 
     private static final int CPU_CORES = Runtime.getRuntime().availableProcessors();
 
+    // 当前 FFmpeg 会话，用于取消操作
+    private static volatile FFmpegSession currentSession;
+
     /**
      * 提取音频的回调接口
      */
@@ -29,6 +30,24 @@ public class AudioExtractor {
         void onEtaUpdate(String etaText);
         void onSuccess(File outputFile);
         void onFailure(String message);
+    }
+
+    /**
+     * 取消当前正在执行的提取任务
+     */
+    public static void cancel() {
+        if (currentSession != null) {
+            AppLog.i(TAG, "取消 FFmpeg 会话: " + currentSession.getSessionId());
+            FFmpegKit.cancel(currentSession.getSessionId());
+            currentSession = null;
+        }
+    }
+
+    /**
+     * 查询是否有正在执行的任务
+     */
+    public static boolean isRunning() {
+        return currentSession != null;
     }
 
     /**
@@ -57,16 +76,16 @@ public class AudioExtractor {
                                     String format, int bitrate, int sampleRate,
                                     double startTimeSec, double endTimeSec,
                                     Callback callback) {
-        Log.d(TAG, "开始提取音频, CPU核心数: " + CPU_CORES);
-        if (startTimeSec >= 0) Log.d(TAG, "开始时间: " + startTimeSec + "秒");
-        if (endTimeSec >= 0) Log.d(TAG, "结束时间: " + endTimeSec + "秒");
+        AppLog.d(TAG, "开始提取音频, CPU核心数: " + CPU_CORES);
+        if (startTimeSec >= 0) AppLog.d(TAG, "开始时间: " + startTimeSec + "秒");
+        if (endTimeSec >= 0) AppLog.d(TAG, "结束时间: " + endTimeSec + "秒");
         String command = buildCommand(inputPath, outputPath, format, bitrate, sampleRate,
                 startTimeSec, endTimeSec);
-        Log.d(TAG, "FFmpeg command: " + command);
+        AppLog.d(TAG, "FFmpeg command: " + command);
 
         // 同步获取视频总时长（在后台线程调用，不会阻塞 UI）
         double durationSec = getDurationSync(inputPath);
-        Log.d(TAG, "视频时长: " + durationSec + "秒");
+        AppLog.d(TAG, "视频时长: " + durationSec + "秒");
 
         // 计算实际提取区间时长（用于进度计算，用 final 数组以便 lambda 引用）
         final double[] extractDuration = {durationSec};
@@ -77,12 +96,13 @@ public class AudioExtractor {
         } else if (endTimeSec >= 0 && endTimeSec <= durationSec) {
             extractDuration[0] = endTimeSec;
         }
-        Log.d(TAG, "提取区间时长: " + extractDuration[0] + "秒");
+        AppLog.d(TAG, "提取区间时长: " + extractDuration[0] + "秒");
 
-        FFmpegKit.executeAsync(command, session -> {
-            Log.d(TAG, "FFmpeg 完成, Return code: " + session.getReturnCode());
+        FFmpegSession session = FFmpegKit.executeAsync(command, session1 -> {
+            AppLog.d(TAG, "FFmpeg 完成, Return code: " + session1.getReturnCode());
+            currentSession = null; // 清理会话引用
 
-            if (ReturnCode.isSuccess(session.getReturnCode())) {
+            if (ReturnCode.isSuccess(session1.getReturnCode())) {
                 callback.onProgress(100);
                 callback.onEtaUpdate("已完成");
                 File outputFile = new File(outputPath);
@@ -91,9 +111,11 @@ public class AudioExtractor {
                 } else {
                     callback.onFailure("输出文件未生成");
                 }
+            } else if (ReturnCode.isCancel(session1.getReturnCode())) {
+                callback.onFailure("已取消");
             } else {
-                String failMsg = "FFmpeg 执行失败 (code: " + session.getReturnCode() + ")";
-                String logs = session.getAllLogsAsString();
+                String failMsg = "FFmpeg 执行失败 (code: " + session1.getReturnCode() + ")";
+                String logs = session1.getAllLogsAsString();
                 if (logs != null && logs.length() > 200) {
                     failMsg += "\n" + logs.substring(logs.length() - 200);
                 }
@@ -101,13 +123,13 @@ public class AudioExtractor {
             }
         }, log -> {
             // 仅输出日志，不做进度解析
-            Log.v(TAG, log.getMessage());
+            AppLog.v(TAG, log.getMessage());
         }, statistics -> {
             try {
                 double currentTime = statistics.getTime();
                 double speed = statistics.getSpeed();
 
-                Log.v(TAG, String.format("statistics: time=%.2f, speed=%.2f",
+                AppLog.v(TAG, String.format("statistics: time=%.2f, speed=%.2f",
                         currentTime, speed));
 
                 if (currentTime > 0 && extractDuration[0] > 0) {
@@ -125,7 +147,7 @@ public class AudioExtractor {
                     callback.onEtaUpdate(String.format("已处理 %.0f秒...", currentTime));
                 }
             } catch (Exception e) {
-                Log.w(TAG, "statistics回调异常: " + e.getMessage());
+                AppLog.w(TAG, "statistics回调异常: " + e.getMessage());
             }
         });
     }
@@ -146,17 +168,17 @@ public class AudioExtractor {
                 String output = probeSession.getOutput();
                 if (output != null && !output.isEmpty()) {
                     double duration = Double.parseDouble(output.trim());
-                    Log.d(TAG, "ffprobe 获取时长成功: " + duration + "秒");
+                    AppLog.d(TAG, "ffprobe 获取时长成功: " + duration + "秒");
                     return duration;
                 }
             } else {
-                Log.w(TAG, "ffprobe 返回码: " + probeSession.getReturnCode());
+                AppLog.w(TAG, "ffprobe 返回码: " + probeSession.getReturnCode());
             }
         } catch (Exception e) {
-            Log.w(TAG, "ffprobe 执行异常: " + e.getMessage());
+            AppLog.w(TAG, "ffprobe 执行异常: " + e.getMessage());
         }
 
-        Log.w(TAG, "ffprobe 获取时长失败，进度将使用估算值");
+        AppLog.w(TAG, "ffprobe 获取时长失败，进度将使用估算值");
         return 0;
     }
 

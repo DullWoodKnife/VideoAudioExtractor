@@ -19,6 +19,7 @@
     <!-- 按钮颜色 -->
     <color name="btn_extract_bg">#4A90D9</color>
     <color name="btn_extract_disabled">#B0C4DE</color>
+    <color name="btn_stop_bg">#EF4444</color>
 
     <!-- 进度条 -->
     <color name="progress_bg">#E5E7EB</color>

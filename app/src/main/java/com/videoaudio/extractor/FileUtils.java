@@ -8,7 +8,6 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
-import android.os.ParcelFileDescriptor;
 import android.provider.MediaStore;
 import android.widget.Toast;
 
@@ -27,6 +26,8 @@ import java.util.Set;
  * 处理文件复制、保存、分享等通用操作
  */
 public class FileUtils {
+
+    private static final String TAG = "FileUtils";
 
     private static final String MIME_AUDIO_PREFIX = "audio/";
     private static final String MIME_VIDEO_PREFIX = "video/";
@@ -49,6 +50,7 @@ public class FileUtils {
      */
     public static File copyUriToCache(Context context, Uri uri, String prefix) throws Exception {
         String displayName = queryDisplayName(context, uri);
+        AppLog.d(TAG, "复制文件到缓存: " + displayName);
         String suffix = ".bin";
         if (displayName != null) {
             int dot = displayName.lastIndexOf('.');
@@ -64,6 +66,9 @@ public class FileUtils {
                 throw new IllegalStateException("无法打开输入流");
             }
 
+            long startTime = System.currentTimeMillis();
+            long fileSize;
+
             // 如果输入是 FileInputStream（文件 URI），使用 FileChannel 零拷贝
             if (in instanceof FileInputStream) {
                 try (FileChannel srcChannel = ((FileInputStream) in).getChannel();
@@ -71,6 +76,7 @@ public class FileUtils {
                      FileChannel dstChannel = fos.getChannel()) {
                     dstChannel.transferFrom(srcChannel, 0, Long.MAX_VALUE);
                 }
+                AppLog.d(TAG, "零拷贝完成: " + outFile.getName());
             } else {
                 // 非文件输入流（如 content://），使用大缓冲区
                 try (OutputStream out = new FileOutputStream(outFile)) {
@@ -81,7 +87,13 @@ public class FileUtils {
                     }
                     out.flush();
                 }
+                AppLog.d(TAG, "缓冲区拷贝完成: " + outFile.getName());
             }
+
+            fileSize = outFile.length();
+            AppLog.i(TAG, "文件复制完成: " + outFile.getName()
+                    + ", 大小: " + formatFileSize(fileSize)
+                    + ", 耗时: " + (System.currentTimeMillis() - startTime) + "ms");
         }
 
         return outFile;
@@ -141,6 +153,7 @@ public class FileUtils {
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             context.startActivity(intent);
         } catch (Exception e) {
+            AppLog.e(TAG, "打开文件失败: " + file.getName(), e);
             Toast.makeText(context, "无法打开文件", Toast.LENGTH_SHORT).show();
         }
     }
@@ -157,6 +170,7 @@ public class FileUtils {
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             context.startActivity(Intent.createChooser(intent, "分享文件"));
         } catch (Exception e) {
+            AppLog.e(TAG, "分享文件失败: " + file.getName(), e);
             Toast.makeText(context, "无法分享文件", Toast.LENGTH_SHORT).show();
         }
     }
@@ -214,7 +228,7 @@ public class FileUtils {
                 return true;
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            AppLog.e(TAG, "保存文件到公共目录失败: " + sourceFile.getName(), e);
             return false;
         }
     }
