@@ -790,7 +790,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="0dp">
+            android:layout_marginBottom="0dp"
+            xmlns:app="http://schemas.android.com/apk/res-auto">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_extract"
@@ -803,7 +804,6 @@
                 android:enabled="false"
                 app:cornerRadius="26dp"
                 app:backgroundTint="@color/btn_extract_bg"
-                xmlns:app="http://schemas.android.com/apk/res-auto"
                 app:icon="@drawable/ic_extract"
                 app:iconGravity="textStart"
                 app:iconTint="@android:color/white" />
