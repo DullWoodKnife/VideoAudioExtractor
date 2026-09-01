@@ -121,6 +121,9 @@ public class VideoConverter {
         });
         currentSession = session; // 保存会话引用
     }
+
+    /**
+     * 同步执行 ffprobe 获取视频时长（秒）
      */
     private static double getDurationSync(String inputPath) {
         String probeCommand = String.format(
